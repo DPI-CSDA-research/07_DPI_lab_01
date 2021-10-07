@@ -19,7 +19,7 @@ class ImageDissector:
             img[mask] = g[0]
             img[~mask] = g[1]"""
             result = np.where(img < f[0], g[0], g[1])
-        return result
+        return result.astype(dtype=np.uint8)
 
 
 class MinMaxFilter:
@@ -29,16 +29,17 @@ class MinMaxFilter:
             img = np.array(img)
         _hb = int(pool[0]/2)
         _vb = int(pool[0]/2)
-        result_shape = (
-            img.shape[0] + 2 * _hb,
-            img.shape[1] + 2 * _vb,
-        )
-        result = np.zeros(shape=(result_shape[0], result_shape[1], *img.shape[2:]))
-        result[_hb:-_hb:, _vb:_vb:, ...] = img
-        for x in range(_hb, result.shape[0]-_hb):
-            for y in range(_vb, result.shape[1]-_vb):
-                result[x, y, ...] = np.amin(result[x-_hb:x+_hb, y-_vb:y+_vb, ...])
-        return result[_hb:-_hb:, _vb:_vb:, ...]
+        result = np.zeros(shape=img.shape)
+        for x in range(1, img.shape[0]-1):
+            for y in range(1, img.shape[1]-1):
+                result[x, y] = np.amin(img[x - _hb:x + _hb + 1, y - _vb:y + _vb + 1], axis=(0, 1))
+        """_hb = int(pool[0] / 2)
+        _vb = int(pool[0] / 2)
+        result = np.zeros(shape=img.shape)
+        for x in range(-int(result.shape[0]/2), int(result.shape[0]/2)):
+            for y in range(-int(result.shape[1]/2), int(result.shape[1]/2)):
+                result[x, y] = np.reshape(np.amin(img[x-_hb:x+_hb+1, y-_vb:y+_vb+1], axis=(0, 1)), newshape=(1, 1, 3))"""
+        return result
 
     @staticmethod
     def max_filter(img, pool=(3, 3)):
@@ -52,8 +53,8 @@ class MinMaxFilter:
         )
         result = np.zeros(shape=(result_shape[0], result_shape[1], *img.shape[2:]))
         result[_hb:-_hb:, _vb:_vb:, ...] = img
-        for x in range(_hb, result.shape[0]-_hb):
-            for y in range(_vb, result.shape[1]-_vb):
+        for x in range(-result.shape[0]/2, result.shape[0]/2):
+            for y in range(-int(result.shape[1]/2), int(result.shape[1]/2)):
                 result[x, y, ...] = np.amin(result[x-_hb:x+_hb, y-_vb:y+_vb, ...])
         return result[_hb:-_hb:, _vb:_vb:, ...]
 
@@ -84,20 +85,31 @@ class ImageAnalyser:
 
 
 def lab(path, bin_num=16):
-    params = [0.33, 0.66, 0.33, 0.66]
+    params = [75, 200, 75, 200]
     _labels = [f"f(min) parameter: ", f"f(max) parameter: ", f"g(min) parameter: ", f"g(max) parameter: "]
-    print(f"Image dissection parameters")
+    print(f"Image dissection parameters [0...255]")
     for i in range(len(params)):
         try:
-            temp = float(input(_labels[i]))
+            temp = int(input(_labels[i]))
             params[i] = temp if temp != 0 else params[i]
         except ValueError:
             continue
     img = plt.imread(path)
     dissected = ImageDissector.dissect(img, (params[0], params[1]), (params[2], params[3]))
-    bins, hist = ImageAnalyser.hist(img, bin_num)
-    plt.figure().add_subplot()
-    plt.gca().hist(bins[:-1], bins, weights=hist)
+    filtered_min = MinMaxFilter.min_filter(img)
+    # filtered_max = MinMaxFilter.max_filter(img)
+    # filtered_minmax = MinMaxFilter.minmax_filter(img)
+    # bins, hist = ImageAnalyser.hist(img, bin_num)
+    # plt.figure().add_subplot()
+    # plt.gca().hist(bins[:-1], bins, weights=hist)
+
+    figures = [plt.figure()]
+    figures[0].add_subplot().imshow(img)
+    figures.append(plt.figure())
+    figures[1].add_subplot().imshow(dissected)
+    figures.append(plt.figure())
+    figures[2].add_subplot().imshow(filtered_min)
+    plt.show()
     pass
 
 
